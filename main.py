@@ -30,6 +30,8 @@ stopDate = int(datetime(2024, 12, 25).timestamp() * 1000)
 
 #date to start gathering data
 currDate = int(datetime(2024, 10, 1).timestamp() * 1000)
+
+# candlestick data is put into candles.npy to be used as training data
 '''
 candleData = []
 
@@ -70,10 +72,12 @@ np.save('val_candles.npy', candleData)
 '''
 
 # Tohlcv (structure of each candle in list form)
+
+#device for operations is picked
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f'Using device: {device}')
 
-
+# candle dataset and validation set are loaded
 npCandles = np.load('candles.npy')
 historicalCandles = np.load('candles.npy').tolist()
 validationCandles = np.load('val_candles.npy').tolist()
@@ -89,13 +93,14 @@ plt.ylabel('Closing Price')
 plt.title('Historical Candles Dataset')
 plt.show()
 '''
-
 # for normalizing try logarithmic or sections (couple days probs)
 minPercent = 0.0
 maxPercent = 0.0
 
 historicalCandles[0][0] = 0
-predictIndex = 0
+
+# this is what the model will predict, it is the index in the candle (tohlcv and price change val)
+predictIndex = 6
 
 # getting percentage changes in closing prices
 for i in range(len(historicalCandles)):
@@ -107,6 +112,22 @@ for i in range(len(historicalCandles)):
         elif currPercent > maxPercent:
             maxPercent = historicalCandles[i][0]
 
+# adding value for if the price increased or decreased over the last candle, this is what the model will predict
+
+for i in range(len(historicalCandles)):
+    if i > 0 and historicalCandles[i][4] > historicalCandles[i-1][4]:
+        historicalCandles[i].append(1)
+    else:
+        historicalCandles[i].append(0)
+print("Candle price change data added")
+
+# same thing done for the validation candles
+for i in range(len(validationCandles)):
+    if i > 0 and validationCandles[i][4] > validationCandles[i-1][4]:
+        validationCandles[i].append(1)
+    else:
+        validationCandles[i].append(0)
+print("Validation candle price change data added")
 
 def sectionNormalize(candleList, sectionSize):
     candleList = np.array(candleList)
@@ -127,6 +148,7 @@ def sectionNormalize(candleList, sectionSize):
     normalizedList = normalizedList[0:(len(candleList - 1) - sectionSize)]
     return normalizedList
 
+# this method is currently in use to normalize the candle data
 def maxNormalize(candleList, max):
     candleList = np.array(candleList)
     normalizedList = np.copy(candleList)
@@ -202,7 +224,7 @@ def createSequenceBatches(sequences, targets, batch_size):
 
 print(f'Using device: {device}')
 
-model = LSTMModel(input_size=6, hidden_size=128, output_size=1).to(device)
+model = LSTMModel(input_size=7, hidden_size=64, output_size=1).to(device)
 criterion = nn.MSELoss()
 optimizer = optim.Adam(model.parameters(), lr=1e-4)
 
@@ -227,7 +249,7 @@ targets = np.load('targets.npy')
 valSequences = np.load('valSequences.npy')
 valTargets = np.load('valTargets.npy')
 
-
+'''
 # data is shuffled to help with training
 print("Shuffling data...")
 # targets and sequences in pairs:
@@ -245,6 +267,7 @@ shuffledTargets = torch.tensor(np.array(shuffledTargets))
 print("it converted them into tensors")
 print(type(shuffledSequences), type(shuffledTargets))
 print(shuffledSequences.shape, shuffledTargets.shape)
+'''
 
 targets = torch.tensor(targets)
 sequences = torch.tensor(sequences)
